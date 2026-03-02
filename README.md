@@ -26,6 +26,8 @@ For a detailed list of all improvements, see [IMPROVEMENTS_SUMMARY.md](IMPROVEME
 
 ---
 
+Added Manual Buy. 3.1.26
+
 # Original README Content Follows
 
 
