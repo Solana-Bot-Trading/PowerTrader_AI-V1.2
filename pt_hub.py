@@ -588,6 +588,8 @@ class _RobinhoodDirectClient:
     def place_market_buy(self, symbol_base: str, amount_usd: float) -> Tuple[bool, str]:
         """
         Place a market buy for `amount_usd` dollars of `symbol_base` (e.g. 'DOGE').
+        Retries up to 5 times, automatically adjusting decimal precision if Robinhood
+        rejects the order for too much precision (mirrors pt_trader.py logic).
         Returns (success, message).
         """
         if not self._ok:
@@ -606,33 +608,63 @@ class _RobinhoodDirectClient:
             return False, f"Could not retrieve current price for {symbol}."
 
         asset_qty = amount_usd / ask
-        rounded_qty = round(asset_qty, 8)
+        max_retries = 5
+        retries = 0
 
-        body_dict = {
-            "client_order_id": str(uuid.uuid4()),
-            "side": "buy",
-            "type": "market",
-            "symbol": symbol,
-            "market_order_config": {
-                "asset_quantity": f"{rounded_qty:.8f}"
-            },
-        }
-        body_str = json.dumps(body_dict)
+        while retries < max_retries:
+            retries += 1
+            resp = None
+            try:
+                rounded_qty = round(asset_qty, 8)
 
-        resp = self._request("POST", "/api/v1/crypto/trading/orders/", body_str)
-        if not resp:
-            return False, "No response from Robinhood. Check credentials and connectivity."
+                body_dict = {
+                    "client_order_id": str(uuid.uuid4()),
+                    "side": "buy",
+                    "type": "market",
+                    "symbol": symbol,
+                    "market_order_config": {
+                        "asset_quantity": f"{rounded_qty:.8f}"
+                    },
+                }
+                body_str = json.dumps(body_dict)
 
-        if "errors" in resp or "error" in resp:
-            err_detail = resp.get("errors") or resp.get("error") or resp
-            return False, f"Order rejected: {err_detail}"
+                resp = self._request("POST", "/api/v1/crypto/trading/orders/", body_str)
 
-        order_id = resp.get("id", "unknown")
-        state = resp.get("state", "unknown")
-        return True, (
-            f"Order placed for {rounded_qty:.8f} {symbol_base.upper()} "
-            f"(~${amount_usd:.2f} at ${ask:,.4f})  |  ID: {order_id}  |  State: {state}"
-        )
+                if not resp:
+                    return False, "No response from Robinhood. Check credentials and connectivity."
+
+                if "errors" not in resp and "error" not in resp:
+                    order_id = resp.get("id", "unknown")
+                    state = resp.get("state", "unknown")
+                    return True, (
+                        f"Order placed for {rounded_qty:.8f} {symbol_base.upper()} "
+                        f"(~${amount_usd:.2f} at ${ask:,.4f})  |  ID: {order_id}  |  State: {state}"
+                    )
+
+            except Exception:
+                pass
+
+            # Handle precision and minimum-size errors from Robinhood
+            if resp and "errors" in resp:
+                for error in resp["errors"]:
+                    detail = error.get("detail", "")
+                    if "has too much precision" in detail:
+                        # Parse the required precision from the error and retry
+                        try:
+                            nearest_value = detail.split("nearest ")[1].split(" ")[0]
+                            decimal_places = len(nearest_value.split(".")[1].rstrip("0"))
+                            asset_qty = round(asset_qty, decimal_places)
+                        except Exception:
+                            pass
+                        break
+                    elif "must be greater than or equal to" in detail:
+                        return False, f"Order rejected: amount too small for {symbol_base.upper()}. Try a larger dollar amount."
+                else:
+                    # No retryable error found — return the full error detail
+                    err_detail = resp.get("errors") or resp.get("error") or resp
+                    return False, f"Order rejected: {err_detail}"
+
+        return False, "Order failed after maximum retries. Check your amount and try again."
 
 
 # -----------------------------
