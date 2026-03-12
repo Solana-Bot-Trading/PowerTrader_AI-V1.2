@@ -588,8 +588,6 @@ class _RobinhoodDirectClient:
     def place_market_buy(self, symbol_base: str, amount_usd: float) -> Tuple[bool, str]:
         """
         Place a market buy for `amount_usd` dollars of `symbol_base` (e.g. 'DOGE').
-        Retries up to 5 times, automatically adjusting decimal precision if Robinhood
-        rejects the order for too much precision (mirrors pt_trader.py logic).
         Returns (success, message).
         """
         if not self._ok:
@@ -608,63 +606,134 @@ class _RobinhoodDirectClient:
             return False, f"Could not retrieve current price for {symbol}."
 
         asset_qty = amount_usd / ask
-        max_retries = 5
-        retries = 0
+        rounded_qty = round(asset_qty, 8)
 
-        while retries < max_retries:
-            retries += 1
-            resp = None
-            try:
-                rounded_qty = round(asset_qty, 8)
+        body_dict = {
+            "client_order_id": str(uuid.uuid4()),
+            "side": "buy",
+            "type": "market",
+            "symbol": symbol,
+            "market_order_config": {
+                "asset_quantity": f"{rounded_qty:.8f}"
+            },
+        }
+        body_str = json.dumps(body_dict)
 
-                body_dict = {
-                    "client_order_id": str(uuid.uuid4()),
-                    "side": "buy",
-                    "type": "market",
-                    "symbol": symbol,
-                    "market_order_config": {
-                        "asset_quantity": f"{rounded_qty:.8f}"
-                    },
-                }
-                body_str = json.dumps(body_dict)
+        resp = self._request("POST", "/api/v1/crypto/trading/orders/", body_str)
+        if not resp:
+            return False, "No response from Robinhood. Check credentials and connectivity."
 
-                resp = self._request("POST", "/api/v1/crypto/trading/orders/", body_str)
+        if "errors" in resp or "error" in resp:
+            err_detail = resp.get("errors") or resp.get("error") or resp
+            return False, f"Order rejected: {err_detail}"
 
-                if not resp:
-                    return False, "No response from Robinhood. Check credentials and connectivity."
+        order_id = resp.get("id", "unknown")
+        state = resp.get("state", "unknown")
+        return True, (
+            f"Order placed for {rounded_qty:.8f} {symbol_base.upper()} "
+            f"(~${amount_usd:.2f} at ${ask:,.4f})  |  ID: {order_id}  |  State: {state}"
+        )
 
-                if "errors" not in resp and "error" not in resp:
-                    order_id = resp.get("id", "unknown")
-                    state = resp.get("state", "unknown")
-                    return True, (
-                        f"Order placed for {rounded_qty:.8f} {symbol_base.upper()} "
-                        f"(~${amount_usd:.2f} at ${ask:,.4f})  |  ID: {order_id}  |  State: {state}"
-                    )
+    def get_held_quantity(self, symbol_base: str) -> Tuple[bool, float, str]:
+        """
+        Return the total quantity held for `symbol_base` (e.g. 'DOGE').
+        Returns (success, quantity, message).
+        On success, quantity >= 0.0.
+        """
+        if not self._ok:
+            return False, 0.0, self._err
 
-            except Exception:
-                pass
+        try:
+            resp = self._request("GET", "/api/v1/crypto/trading/holdings/")
+            if not resp or "results" not in resp:
+                return False, 0.0, "No response from Robinhood holdings endpoint."
 
-            # Handle precision and minimum-size errors from Robinhood
-            if resp and "errors" in resp:
-                for error in resp["errors"]:
-                    detail = error.get("detail", "")
-                    if "has too much precision" in detail:
-                        # Parse the required precision from the error and retry
-                        try:
-                            nearest_value = detail.split("nearest ")[1].split(" ")[0]
-                            decimal_places = len(nearest_value.split(".")[1].rstrip("0"))
-                            asset_qty = round(asset_qty, decimal_places)
-                        except Exception:
-                            pass
-                        break
-                    elif "must be greater than or equal to" in detail:
-                        return False, f"Order rejected: amount too small for {symbol_base.upper()}. Try a larger dollar amount."
-                else:
-                    # No retryable error found — return the full error detail
-                    err_detail = resp.get("errors") or resp.get("error") or resp
-                    return False, f"Order rejected: {err_detail}"
+            target = symbol_base.strip().upper()
+            for holding in resp["results"]:
+                if str(holding.get("asset_code", "")).strip().upper() == target:
+                    qty = float(holding.get("total_quantity", 0.0))
+                    return True, qty, f"{qty:.8f} {target} held"
 
-        return False, "Order failed after maximum retries. Check your amount and try again."
+            # Coin found in request but not in holdings — means zero balance
+            return True, 0.0, f"No {target} position found in Robinhood holdings."
+
+        except Exception as exc:
+            return False, 0.0, f"Error fetching holdings: {exc}"
+
+    def get_all_held_coins(self) -> Tuple[bool, List[str], str]:
+        """
+        Return a sorted list of coin symbols (e.g. ['BTC', 'DOGE']) that have
+        total_quantity > 0 in Robinhood holdings.
+        Returns (success, coins_list, message).
+        """
+        if not self._ok:
+            return False, [], self._err
+
+        try:
+            resp = self._request("GET", "/api/v1/crypto/trading/holdings/")
+            if not resp or "results" not in resp:
+                return False, [], "No response from Robinhood holdings endpoint."
+
+            coins = sorted([
+                str(h.get("asset_code", "")).strip().upper()
+                for h in resp["results"]
+                if float(h.get("total_quantity", 0.0)) > 0.0
+            ])
+            return True, coins, f"{len(coins)} coin(s) with positive balance."
+
+        except Exception as exc:
+            return False, [], f"Error fetching holdings: {exc}"
+
+    def place_market_sell(self, symbol_base: str) -> Tuple[bool, str]:
+        """
+        Place a market sell of 100% of the held quantity of `symbol_base` (e.g. 'DOGE').
+        Returns (success, message).
+        """
+        if not self._ok:
+            return False, self._err
+
+        symbol = f"{symbol_base.strip().upper()}-USD"
+
+        # Validate symbol
+        valid = self.get_valid_symbols()
+        if valid and symbol not in valid:
+            return False, f"'{symbol}' is not a valid Robinhood trading pair."
+
+        # Get held quantity
+        ok, qty, qty_msg = self.get_held_quantity(symbol_base)
+        if not ok:
+            return False, qty_msg
+
+        if qty <= 0.0:
+            return False, f"No {symbol_base.upper()} holdings to sell. {qty_msg}"
+
+        rounded_qty = round(qty, 8)
+
+        body_dict = {
+            "client_order_id": str(uuid.uuid4()),
+            "side": "sell",
+            "type": "market",
+            "symbol": symbol,
+            "market_order_config": {
+                "asset_quantity": f"{rounded_qty:.8f}"
+            },
+        }
+        body_str = json.dumps(body_dict)
+
+        resp = self._request("POST", "/api/v1/crypto/trading/orders/", body_str)
+        if not resp:
+            return False, "No response from Robinhood. Check credentials and connectivity."
+
+        if "errors" in resp or "error" in resp:
+            err_detail = resp.get("errors") or resp.get("error") or resp
+            return False, f"Order rejected: {err_detail}"
+
+        order_id = resp.get("id", "unknown")
+        state = resp.get("state", "unknown")
+        return True, (
+            f"Sell order placed for {rounded_qty:.8f} {symbol_base.upper()} "
+            f"|  ID: {order_id}  |  State: {state}"
+        )
 
 
 # -----------------------------
@@ -2577,6 +2646,58 @@ class PowerTraderHub(tk.Tk):
             wraplength=260,
             justify="left",
         ).pack(side="left", padx=(10, 0))
+
+
+        # ----------------------------
+        # Manual Sell Panel (100%)
+        # ----------------------------
+        manual_sell_box = ttk.LabelFrame(controls_left, text="Manual Sell (100%)")
+        manual_sell_box.pack(fill="x", padx=6, pady=(0, 6))
+
+        # Row 1: coin dropdown + refresh + sell button
+        ms_row1 = ttk.Frame(manual_sell_box)
+        ms_row1.pack(fill="x", padx=6, pady=(6, 2))
+
+        ttk.Label(ms_row1, text="Coin:").pack(side="left")
+        self._ms_coin_var = tk.StringVar()
+        self._ms_coin_combo = ttk.Combobox(
+            ms_row1,
+            textvariable=self._ms_coin_var,
+            state="readonly",
+            width=8,
+            values=["— click ⟳ —"],
+        )
+        self._ms_coin_combo.pack(side="left", padx=(4, 4))
+
+        self._ms_refresh_btn = ttk.Button(
+            ms_row1,
+            text="⟳",
+            width=3,
+            command=self._on_ms_refresh_click,
+        )
+        self._ms_refresh_btn.pack(side="left", padx=(0, 8))
+
+        self._ms_sell_btn = ttk.Button(
+            ms_row1,
+            text="Sell 100%",
+            width=10,
+            command=self._on_manual_sell_click,
+            state="disabled",
+        )
+        self._ms_sell_btn.pack(side="left")
+
+        # Row 2: status label
+        ms_row2 = ttk.Frame(manual_sell_box)
+        ms_row2.pack(fill="x", padx=6, pady=(2, 6))
+
+        self._ms_status_var = tk.StringVar(value="Click ⟳ to load held coins.")
+        ttk.Label(
+            ms_row2,
+            textvariable=self._ms_status_var,
+            foreground=DARK_MUTED,
+            wraplength=260,
+            justify="left",
+        ).pack(side="left", padx=(0, 0))
 
 
         # Neural levels overview (spans FULL width under the dual section)
@@ -5711,6 +5832,114 @@ class PowerTraderHub(tk.Tk):
                     except Exception:
                         pass
                 self.after(500, _trigger_train)
+
+        except Exception as exc:
+            _set_status(f"Unexpected error: {exc}")
+
+        finally:
+            _re_enable()
+
+    def _on_ms_refresh_click(self) -> None:
+        """Disable refresh button and fetch live holdings in a background thread."""
+        self._ms_refresh_btn.configure(state="disabled")
+        self._ms_sell_btn.configure(state="disabled")
+        self._ms_status_var.set("Loading held coins from Robinhood...")
+        self._ms_coin_var.set("")
+        self._ms_coin_combo.configure(values=[])
+
+        t = threading.Thread(target=self._do_ms_refresh, daemon=True)
+        t.start()
+
+    def _do_ms_refresh(self) -> None:
+        """
+        Background thread: fetch holdings from Robinhood and populate the combobox
+        with coins that have total_quantity > 0.
+        """
+        def _done(coins: list, status: str) -> None:
+            def _update():
+                if coins:
+                    self._ms_coin_combo.configure(values=coins, state="readonly")
+                    self._ms_coin_var.set(coins[0])
+                    self._ms_sell_btn.configure(state="normal")
+                else:
+                    self._ms_coin_combo.configure(values=["— none held —"], state="disabled")
+                    self._ms_coin_var.set("")
+                    self._ms_sell_btn.configure(state="disabled")
+                self._ms_status_var.set(status)
+                self._ms_refresh_btn.configure(state="normal")
+            self.after(0, _update)
+
+        try:
+            client = _RobinhoodDirectClient()
+            if not client.ready:
+                _done([], f"Error: {client.error}")
+                return
+
+            ok, held_coins, msg = client.get_all_held_coins()
+            if not ok:
+                _done([], f"Error: {msg}")
+                return
+
+            if held_coins:
+                _done(held_coins, f"{len(held_coins)} coin(s) held. Select and click Sell 100%.")
+            else:
+                _done([], "No coins with a positive balance found.")
+
+        except Exception as exc:
+            _done([], f"Unexpected error: {exc}")
+
+    def _on_manual_sell_click(self) -> None:
+        """Validate selection and kick off a background 100% sell thread, with confirmation dialog."""
+        coin_raw = (self._ms_coin_var.get() or "").strip().upper()
+
+        if not coin_raw or coin_raw.startswith("—"):
+            self._ms_status_var.set("Error: Select a coin from the dropdown first (click ⟳).")
+            return
+
+        # Confirm before executing to prevent accidental full sells
+        confirmed = tk.messagebox.askyesno(
+            title="Confirm 100% Sell",
+            message=f"Sell 100% of your {coin_raw} position on Robinhood?\n\nThis cannot be undone.",
+            icon="warning",
+        )
+        if not confirmed:
+            self._ms_status_var.set("Cancelled.")
+            return
+
+        self._ms_sell_btn.configure(state="disabled")
+        self._ms_status_var.set(f"Fetching {coin_raw} holdings and placing sell order...")
+
+        t = threading.Thread(
+            target=self._do_manual_sell,
+            args=(coin_raw,),
+            daemon=True,
+        )
+        t.start()
+
+    def _do_manual_sell(self, coin: str) -> None:
+        """
+        Background thread: fetch held quantity then place a 100% market sell via Robinhood.
+        All UI updates are posted back to the main thread via self.after().
+        """
+        def _set_status(msg: str) -> None:
+            self.after(0, lambda: self._ms_status_var.set(msg))
+
+        def _re_enable() -> None:
+            self.after(0, lambda: self._ms_sell_btn.configure(state="normal"))
+
+        try:
+            client = _RobinhoodDirectClient()
+            if not client.ready:
+                _set_status(f"Error: {client.error}")
+                _re_enable()
+                return
+
+            success, msg = client.place_market_sell(coin)
+
+            if not success:
+                _set_status(f"Error: {msg}")
+            else:
+                _set_status(f"Success: {msg}")
 
         except Exception as exc:
             _set_status(f"Unexpected error: {exc}")
