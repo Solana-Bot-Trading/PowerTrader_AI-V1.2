@@ -1,233 +1,152 @@
-# PowerTrader AI V1.2 - Enhanced Fork
+# PowerTrader AI V1.0 — Fork
 
-**This is an enhanced fork of [garagesteve1155/PowerTrader_AI](https://github.com/garagesteve1155/PowerTrader_AI)**
+Fully automated crypto trading powered by a custom price prediction AI and a structured/tiered DCA system, enhanced with small account optimization, risk management, and IRS tax export.
 
-## 🚀 What's New in This Fork
-
-This fork adds comprehensive small account optimizations and advanced risk management features:
-
-- **✅ Three-Tier Account Mode System** - Auto-detects and optimizes for accounts of any size
-- **✅ Small Account Optimizations** - Specialized settings for accounts under $2,500
-- **✅ Hard Stop Loss Protection** - Automatic -35% stop with intelligent neural override
-- **✅ Tiered Profit Taking** - 3-stage exits (33% at +7%, 50% at +15%, trail rest)
-- **✅ Reserve Capital Management** - Enforces 20% minimum cash reserve
-- **✅ Enhanced GUI Metrics** - Win rate, avg win/loss, best/worst coin tracking
-- **✅ 100% Backward Compatible** - All original functionality preserved
-- **✅ Manually buy coins within the Bot** - All original functionality preserved
-
-### 📊 Improvements Summary
-
-For a detailed list of all improvements, see [IMPROVEMENTS_SUMMARY.md](IMPROVEMENTS_SUMMARY.md)
-
-**Key Stats:**
-- 5,000% increase in capital deployment efficiency for small accounts
-- -35% hard stop protection vs unlimited downside in original
-- 3-tier profit system vs single all-or-nothing exit
-- 4 new performance tracking metrics
-
-
-3.1.2026 - Added Manual Buy to the gui. you have the choice to Auto train or manually train the added coin.
-
-3.11.26 - Added a Manual Sell panel to the Controls / Health tab, directly below the existing Manual Buy panel. Allows the user to place an immediate 100% market sell of any held coin directly from the Hub GUI without leaving the application.
----
-
-
-
-# Original README Content Follows
-
-
-# PowerTrader_AI
-Fully automated crypto trading powered by a custom price prediction AI and a structured/tiered DCA system.
-
-I have not checked any PowerTrader AI forks and cannot confirm or deny their legitimacy.
-
-This is my personal trading bot that I decided to make open source. I made this strategy to match my personal goals. This system is meant to be a foundation/framework for you to build your dream bot! You are responsible for all financial and security risks associated with PowerTrader AI.
-
-I know there are "commonly essential" trading features that are missing (like no stop loss for example). This is by design because many of those things would just not work with this system's strategy as it stands, for my personal reasons below:
-
-I do not believe in selling worthwhile coins at a loss (and why would you trade anything besides worthwhile coins with a trading bot, anyways???).
-
-I DO believe in crypto. I'd rather just wait and maybe add more money to my account if need be so that the bot can buy even more of the coin while the price is down.
-
-I personally feel like many of those common things people use, like stop loss, are actually a trick or something, and I personally have absolutely no problem adding more money to my account to afford more DCA or having to wait for extended periods of time, if need be. In my opinion, anything else is just greedy and desperate, which is the exact OPPOSITE of needed attributes for long term growth. Plus, this is just spot trading... there's no worry of liquidation and it feels to me like many "risk management" tactics are really only meant for futures trading but people blindly apply them to spot trading when it just plain isn't necessary.
-
-I know the AI and the trading strategy are extremely simple because I'm the one that designed and made them. I've been developing this specific trading strategy for almost a decade and the design of the AI system for the last few years. The overall strategy is based on what ACTUALLY works from real trading experience, not just stuff I read in LLM responses or search engine results.
-
-
-Ok now that all of that is out of the way...
-
-I am not selling anything. This trading bot is not a product. This system is for experimentation and education. The only reason you would EVER send me money is if you are voluntarily donating (donation routes can be found at the bottom of this readme :) ). Do not fall for any scams! PowerTrader AI is COMPLETELY FREE FOREVER!
-
-IMPORTANT: This software places real trades automatically. You are responsible for everything it does to your money and your account. Keep your API keys private. I am not giving financial advice. I am not responsible for any losses incurred or any security breaches to your computer (the code is entirely open source and can be confirmed non-malicious). You are fully responsible for doing your own due diligence to learn and understand this trading system and to use it properly. You are fully responsible for all of your money and all of the bot's actions, and any gains or losses.
-
-“It’s an instance-based (kNN/kernel-style) predictor with online per-instance reliability weighting, used as a multi-timeframe trading signal.” - ChatGPT on the type of AI used in this trading bot.
-
-So what exactly does that mean?
-
-When people think AI, they usually think about LLM style AIs and neural networks. What many people don't realize is there are many types of Artificial Intelligence and Machine Learning - and the one in my trading system falls under the "Other" category.
-
-When training for a coin, it goes through the entire history for that coin on multiple timeframes and saves each pattern it sees, along with what happens on the next candle AFTER the pattern. It uses these saved patterns to generate a predicted candle by taking a weighted average of the closest matches in memory to the current pattern in time. This weighted average output is done once for each timeframe, from 1 hour up to 1 week. Each timeframe gets its own predicted candle. The low and high prices from these candles are what are shown as the blue and orange horizontal lines on the price charts. 
-
-After a candle closes, it checks what happened against what it predicted, and adjusts the weight for each "memory pattern" that was used to generate the weighted average, depending on how accurate each pattern was compared to what actually happened.
-
-Yes, it is EXTREMELY simple. Yes, it is STILL considered AI.
-
-Here is how the trading bot utilizes the price prediction ai to automatically make trades:
-
-For determining when to start trades, the AI's Thinker script sends a signal to start a trade for a coin if the ask price for the coin drops below at least 3 of the the AI's predicted low prices for the coin (it predicts the currently active candle's high and low prices for each timeframe across all timeframes from 1hr to 1wk).
-
-For determining when to DCA, it uses either the current price level from the AI that is tied to the current amount of DCA buys that have been done on the trade (for example, right after a trade starts when 3 blue lines get crossed, its first DCA wont happen until the price crosses the 4th line, so on so forth), or it uses the hardcoded drawdown % for its current level, whichever it hits first. It only allows a max of 2 DCAs within a rolling 24hr window to keep from dumping all of your money in too quickly on coins that are having an extended downtrend. Other risk management features can easily be added, as well, with just a bit of Python code!
-
-For determining when to sell, the bot uses a trailing profit margin to maximize the potential gains. The margin line is set at either 5% gain if no DCA has happened on the trade, or 2.5% gain if any DCA has happened. The trailing margin gap is 0.5% (this is the amount the price has to go over the profit margin to begin raising the profit margin up to TRAIL after the price and maximize how much profit is gained once the price drops below the profit margin again and the bot sells the trade.
-
-
-# Setup & First-Time Use (Windows)
-
-THESE INSTRUCTIONS WERE WRITTEN BY AI! PLEASE LET ME KNOW IF THERE ARE ANY ERRORS OR ISSUES WITH THIS SETUP PROCESS!
-
-If you have any crypto holdings in Robinhood currently, either transfer them out of your Robinhood account or sell them to dollars BEFORE going through this setup process!
-
-This page walks you through installing PowerTrader AI from start to finish, in the exact order a first-time user should do it.  
-No coding knowledge needed.  
-These instructions are Windows-based but PowerTrader AI *should* be able to run on any OS.
-
-IMPORTANT: This software places real trades automatically. You are responsible for everything it does to your money and your account. Keep your API keys private. I am not giving financial advice. I am not responsible for any losses incurred or any security breaches to your computer (the code is entirely open source and can be confirmed non-malicious). You are fully responsible for doing your own due diligence to learn and understand this trading system and to use it properly. You are fully responsible for all of your money and all of the bot's actions, and any gains or losses.
+**Forked from:** [garagesteve1155/PowerTrader_AI](https://github.com/garagesteve1155/PowerTrader_AI)
 
 ---
 
-## Step 1 — Install Python
+## What This Fork Adds
 
-1. Go to **python.org** and download Python for Windows.
-2. Run the installer.
-3. **Check the box** that says: **“Add Python to PATH”**.
-4. Click **Install Now**.
+This fork builds on garagesteve's excellent foundation with features specifically designed for small account profitability, capital preservation, and tax compliance. All changes are backward compatible — set `account_mode: "force_existing"` to revert to 100% original behavior.
 
----
+### Small Account Optimization (accounts under $2,500)
+- **Auto-detection** of account size with appropriate settings applied automatically
+- **10% position sizing** instead of 0.005% (turns $0.50 trades into $25 trades)
+- **Linear DCA** (equal-size buys) instead of exponential (2x multiplier)
+- **3 wider DCA levels** (-7.5%, -15%, -25%) instead of 7 aggressive levels
+- **Max 3 concurrent positions** to prevent correlation overload
+- **20% cash reserve** enforced to maintain dry powder
 
-## Step 2 — Download PowerTrader AI
+### Risk Management
+- **Hard stop loss at -35%** with one-time neural L7 override before forced exit
+- **Tiered profit taking** — sell 33% at +7%, 50% of remainder at +15%, trail the rest
+- **Neural DCA confirmation** required before executing DCA entries on small accounts
 
-1. Do not download the zip file of the repo! There is an issue I have to fix.
-2. Create a folder on your computer, like: `C:\PowerTraderAI\`
-3. On the PowerTrader_AI repo page, go to the code page for pt_hub.py, click the "Download Raw File" button, save it into the folder you just created.
-4. Repeat that for all files in the repo (except the readme and the license).
+### Enhanced GUI
+- **Win rate %**, average win/loss, best/worst coin, and hard stop count in the Account box
+- **Manual Buy panel** — place market buys from the Hub with auto coin-add and optional auto-train
+- **Manual Sell panel** — select a held coin and sell 100% from the Hub
+- **Tax Export panel** — one-click IRS Form 8949 CSV export for any tax year
 
----
-
-## Step 3 — Install PowerTrader AI (one command)
-
-1. Open **Command Prompt** (Windows key → type **cmd** → Enter).
-2. Go into your PowerTrader AI folder. Example:
-
-   `cd C:\PowerTraderAI`
-
-3. If using Python 3.12 or higher (or, later on, if you just run into the pkg_resources error) , run this command:
-
-   `python -m pip install "setuptools==81.0.0"`
-
-v81 is required, pkg_resources is not included with v82. I'll change the code away from it soon.
-
-4. Install everything PowerTrader AI needs:
-
-   `python -m pip install -r requirements.txt`
+### Data Accuracy
+- **Paginated order fetching** — follows Robinhood's pagination up to 25 pages per coin to prevent cost basis corruption
+- **Decimal precision P&L** — uses Python's `Decimal` type for cent-accurate profit/loss tracking
+- **Form 8949 CSV export** — generates a tax-ready CSV with all required IRS columns, compatible with TurboTax, H&R Block, FreeTaxUSA, and other tax software
 
 ---
 
-## Step 4 — Start PowerTrader AI
+## Setup
 
-From the same Command Prompt window (inside your PowerTrader folder), run:
+Follow garagesteve's original setup instructions, but use this fork's files instead. All setup steps remain identical.
 
-`python pt_hub.py`
+### Requirements
 
-The app that opens is the **PowerTrader Hub**.  
-This is the only thing you need to run day-to-day.
+```
+Python 3.10+
+```
 
----
+Install dependencies:
+```bash
+python -m pip install -r requirements.txt
+```
 
-## Step 5 — Set your folder, coins, and Robinhood keys (inside the Hub)
+If using Python 3.12+:
+```bash
+python -m pip install "setuptools==81.0.0"
+```
 
-### Open Settings
+### Run
 
-In the Hub, open **Settings** and do this in order:
-
-- **Main Neural Folder**: set this to the same folder that contains `pt_hub.py` (recommended easiest).
-- **Choose which coins to trade**: start with **BTC**.
-- **While you are still in Settings**, click **Robinhood API Setup** and do this:
-
-1. Click **Generate Keys**.
-2. Copy the **Public Key** shown in the wizard.
-3. On Robinhood, add a new API key and paste that Public Key.
-4. Set permissions to allow trading (the wizard tells you what to select).
-5. Robinhood will show your API Key (often starts with `rh`). Copy it.
-6. Paste the API Key back into the wizard and click **Save**.
-7. Close the wizard and go back to the **Settings** screen.
-8. **NOW** click **Save** in Settings.
-
-After saving, you will have two files in your PowerTrader AI folder:  
-`r_key.txt` and `r_secret.txt`  
-Keep them private.
-
-PowerTrader AI uses a simple folder style:  
-**BTC uses the main folder**, and other coins use their own subfolders (like `ETH\`).
+```bash
+python pt_hub.py
+```
 
 ---
 
-## Step 6 — Train (inside the Hub)
+## Files
 
-Training builds the system’s coin “memory” so it can generate signals.
-
-1. In the Hub, click **Train All**.
-2. Wait until training finishes.
-
----
-
-## Step 7 — Start the system (inside the Hub)
-
-When all coins have completed training, click:
-
-1. **Start All**
-
-The Hub will:  
-**start pt_thinker.py**, wait until it is ready, then it will **start pt_trader.py**.  
-You don’t need to manually start separate programs. The hub handles everything!
+| File | Role |
+|---|---|
+| `pt_hub.py` | GUI dashboard — tkinter interface, charts, account display, manual buy/sell, tax export |
+| `pt_trader.py` | Core trading engine — order execution, DCA logic, position management, tax export |
+| `pt_thinker.py` | Neural network runner — generates buy/sell signal levels |
+| `pt_trainer.py` | Neural network trainer — trains models on market data |
+| `requirements.txt` | Python package dependencies |
 
 ---
 
-## Neural Levels (the LONG/SHORT numbers)
+## Configuration
 
-- These are signal strength levels from low to high.
-- They are the predicted high and low prices for all timeframes from 1hr to 1wk.
-- They are used to show how stretched a coin's price is and for determining when to start trades and potentially when to DCA for the first few levels of DCA (Whichever price is higher, the Neural level or the hardcoded drawdown % for the current DCA level.
-- Higher number = stronger signal.
-- LONG = buy-direction signal. SHORT = No-start signal
+All settings are in `gui_settings.json`. Key settings for this fork:
 
-A TRADE WILL START FOR A COIN IF THAT COIN REACHES A LONG LEVEL OF 3 OR HIGHER WHILE HAVING A SHORT LEVEL OF 0! This is adjustable in the settings.
+```json
+{
+  "account_mode": "auto",
+  "small_account_threshold": 2500,
+  "small_account_settings": {
+    "start_allocation_pct": 10.0,
+    "dca_multiplier": 1.0,
+    "dca_levels": [-7.5, -15.0, -25.0],
+    "max_dca_buys_per_24h": 1,
+    "pm_start_pct_no_dca": 8.0,
+    "pm_start_pct_with_dca": 5.0,
+    "trailing_gap_pct": 1.5,
+    "trade_start_level": 4,
+    "hard_stop_enabled": true,
+    "hard_stop_pct": -35.0,
+    "max_positions": 3,
+    "reserve_minimum_pct": 20.0,
+    "require_neural_dca_confirmation": true,
+    "profit_mode": "tiered",
+    "tiered_profit_t1_pct": 7.0,
+    "tiered_profit_t1_sell_pct": 33,
+    "tiered_profit_t2_pct": 15.0,
+    "tiered_profit_t2_sell_pct": 50
+  }
+}
+```
+
+To revert to 100% original behavior:
+```json
+"account_mode": "force_existing"
+```
 
 ---
 
-## Adding more coins (later)
+## Tax Export (Form 8949)
 
-1. Open **Settings**
-2. Add one new coin
-3. Save
-4. Click **Train All**, wait for training to complete
-5. Click **Start All**
+At the end of the tax year, use the Tax Export panel in the Hub GUI:
 
----
+1. Enter the tax year (e.g., 2026)
+2. Click **Export 8949 CSV**
+3. The CSV is saved to `hub_data/form_8949_trades_YYYY.csv`
+4. The containing folder opens automatically
+5. Import the CSV into your tax software
 
-## Donate
-
-PowerTrader AI is COMPLETELY free and open source! If you want to support the project, you can donate or become a member:
-
-- Cash App: **$garagesteve**
-- PayPal: **@garagesteve**
-- Facebook (Subscribe to my Facebook page for only $1/month): **https://www.facebook.com/stephen.bryant.hughes**
+The CSV includes all IRS Form 8949 columns: description of property, date acquired, date sold, proceeds, cost basis, gain or loss, and hold period (short-term vs long-term). A totals row is included at the bottom.
 
 ---
 
-## License
+## Documentation
 
-PowerTrader AI is released under the **Apache 2.0** license.
+- `IMPROVEMENTS_SUMMARY.md` — detailed changelog of every feature, bug fix, and design decision
+- `Project_summary_v_1_3_4_5_26.md` — complete project history with session-by-session development notes
 
 ---
 
-IMPORTANT: This software places real trades automatically. You are responsible for everything it does to your money and your account. Keep your API keys private. I am not giving financial advice. I am not responsible for any losses incurred or any security breaches to your computer (the code is entirely open source and can be confirmed non-malicious). You are fully responsible for doing your own due diligence to learn and understand this trading system and to use it properly. You are fully responsible for all of your money and all of the bot's actions, and any gains or losses.
+## Credits
+
+**Original Author:** garagesteve1155 — [PowerTrader_AI](https://github.com/garagesteve1155/PowerTrader_AI)  
+**Fork Maintainer:** Jim  
+**License:** Apache 2.0
+
+---
+
+## Disclaimer
+
+IMPORTANT: This software places real trades automatically. You are responsible for everything it does to your money and your account. Keep your API keys private. This is not financial advice. The maintainers are not responsible for any losses incurred or any security breaches. You are fully responsible for doing your own due diligence to understand this trading system and use it properly. You are fully responsible for all of your money and any gains or losses.
+
+The Form 8949 CSV export is a convenience tool for record-keeping, not tax advice. Consult a qualified tax professional for your specific situation. Verify all exported data against your Robinhood 1099 and account statements.
+
+**Use at your own risk.**
